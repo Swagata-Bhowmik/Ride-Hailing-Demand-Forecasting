@@ -236,17 +236,27 @@ def get_model_results(scope: ScopeConfig):
     return actual, index, results, False
 
 
+#: Candidate locations for the prepared demand series, in priority order. The
+#: local pipeline writes the full parquet under the git-ignored ``data/``; a small
+#: committed CSV (``dashboard/demand_series.csv``) is the deploy-time fallback so
+#: the hosted app shows the real series without needing the large raw data.
+_SERIES_CANDIDATES = (
+    _PROJECT_ROOT / "data" / "demand_series.parquet",
+    _PROJECT_ROOT / "data" / "demand_series.csv",
+    _PROJECT_ROOT / "dashboard" / "demand_series.csv",
+)
+
+
 def get_demand_series(scope: ScopeConfig) -> "tuple[pd.DataFrame, bool]":
     """Return ``(series, is_real)`` - the prepared series if on disk, else the demo.
 
-    Looks for a prepared demand series saved by the pipeline (``data/demand_series
-    .parquet`` or ``.csv``). If found it is used as-is (``is_real=True``); otherwise
-    a clearly-labelled illustrative series is returned (``is_real=False``) so the
-    reused ``src`` charts still render.
+    Looks for a prepared demand series saved by the pipeline (the git-ignored
+    ``data/demand_series.parquet``/``.csv``) and, failing that, the small committed
+    ``dashboard/demand_series.csv`` used on the deployed app. If found it is used
+    as-is (``is_real=True``); otherwise a clearly-labelled illustrative series is
+    returned (``is_real=False``) so the reused ``src`` charts still render.
     """
-    data_dir = _PROJECT_ROOT / "data"
-    for candidate in ("demand_series.parquet", "demand_series.csv"):
-        path = data_dir / candidate
+    for path in _SERIES_CANDIDATES:
         if path.exists():
             try:
                 if path.suffix == ".parquet":

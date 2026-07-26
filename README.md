@@ -158,6 +158,28 @@ presented as an honest scoreboard:
 - **3–5 models carried forward** for deep explanation, with justification based on
   the reported metrics.
 
+### Real holdout results
+
+Run on the real 12-month series (247,412,659 trips) via
+`python scripts/train_models.py`, scored on the reserved 30-day holdout at the
+system-wide total-daily-demand level (~700k trips/day):
+
+| Model | MAE (trips/day) | RMSE | MAPE |
+|---|---|---|---|
+| Holt-Winters | 26,804 | 36,574 | 3.74% |
+| Prophet | 30,585 | 40,476 | 4.42% |
+| XGBoost | 32,179 | 45,384 | 4.43% |
+| VAR | 32,614 | 47,765 | 4.47% |
+| SARIMA | 46,440 | 56,689 | 6.49% |
+| SARIMAX | 46,440 | 56,689 | 6.49% |
+| LSTM / GRU | — | — | excluded where `tensorflow` is not installed |
+
+The simple **Holt-Winters** baseline is the most accurate here — an honest result:
+a well-tuned baseline beating heavier models is common on a clean, strongly-weekly
+daily series, and it is reported rather than hidden. Carry-forward set:
+Holt-Winters, Prophet, XGBoost, VAR, SARIMA. These real numbers are persisted to
+`dashboard/model_results.json` and rendered by both dashboards.
+
 The selected forecast is then turned into a **driver-positioning recommendation**
 with a **quantified impact** (rider wait-minutes and driver idle-minutes saved),
 showing the assumptions and formula so the number is reproducible.
@@ -210,8 +232,10 @@ logs, demonstrating operational maturity without paid infrastructure.
 - [ ] Drill the geographic grain down to **taxi zone** where data density allows.
 - [ ] Incorporate **exogenous signals** (weather, holidays, events) as model inputs.
 - [ ] Add **prediction intervals** (uncertainty) to forecasts, not just point estimates.
-- [ ] Publish the prepared demand series artifact so the deployed dashboard shows
-      real numbers instead of the illustrative fallback.
+- [x] Publish the prepared demand series artifact so the deployed dashboard shows
+      real numbers instead of the illustrative fallback (committed
+      `dashboard/demand_series.csv` for the series and `dashboard/model_results.json`
+      for the real model scoreboard).
 - [ ] Pilot the India generalisation on an equivalent open dataset where available.
 
 ---
