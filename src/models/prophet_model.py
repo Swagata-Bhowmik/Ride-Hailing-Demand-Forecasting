@@ -200,7 +200,7 @@ class ProphetModel:
             raise ImportError(
                 "The 'prophet' package is required to train the Prophet model but "
                 "is not installed. Install it with `pip install prophet` (see "
-                "requirements.txt). Until then this model is excluded from the "
+                "requirements-full.txt). Until then this model is excluded from the "
                 "comparison."
             ) from exc
 

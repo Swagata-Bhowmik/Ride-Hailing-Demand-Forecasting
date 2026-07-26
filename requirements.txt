@@ -1,31 +1,27 @@
-# Ride-Hailing Demand Forecasting - Python dependencies
-# Pinned to compatible ranges for reproducible environments.
+# Ride-Hailing Demand Forecasting - default (lightweight) dependencies.
+#
+# This is the set the DEPLOYED dashboard and the scheduled GitHub Action install.
+# Streamlit Community Cloud automatically installs from this file (`requirements.txt`
+# at the repo root) - there is no way to point it at a differently-named file - so
+# it is deliberately kept light: the dashboard reads prepared artifacts and fits
+# only the fast Holt-Winters model at runtime, so it never needs the heavy
+# training/deep-learning packages (tensorflow, prophet, xgboost). Those large
+# wheels would exceed the free-tier build/memory limits.
+#
+# For local model training, the deep-learning models, the notebook, and the test
+# suite, install the FULL stack instead:
+#
+#   pip install -r requirements-full.txt
 
 # --- Data handling ---
 pandas>=2.0,<3.0
 pyarrow>=14.0,<18.0
 
-# --- Visualization (EDA charts, forecast plots) ---
+# --- Visualization (EDA charts, forecast-vs-actual plots) ---
 matplotlib>=3.7,<4.0
-plotly>=5.18,<6.0        # interactive charts for the standalone HTML dashboard
-jinja2>=3.1,<4.0         # templating for the self-contained HTML dashboard
 
-# --- Classical / statistical forecasting ---
+# --- Statistical diagnostics + the Holt-Winters model used live in the app ---
 statsmodels>=0.14,<0.15
-prophet>=1.1,<2.0
 
-# --- Machine learning / deep learning ---
-xgboost>=2.0,<3.0
-tensorflow>=2.15,<2.17   # provides tf.keras for LSTM/GRU
-
-# --- Dashboard ---
+# --- Dashboard framework ---
 streamlit>=1.30,<2.0
-
-# --- Testing ---
-hypothesis>=6.90,<7.0
-pytest>=8.0,<9.0
-
-# --- Notebook execution / CI smoke tests ---
-nbconvert>=7.0,<8.0
-papermill>=2.5,<3.0
-ipykernel>=6.29,<7.0

@@ -68,8 +68,8 @@ the *Generalisation to India* section of the dashboard).
 ride-hailing-demand-forecasting/
 ├── README.md
 ├── .gitignore                    # excludes data/, venvs, secrets, brief file
-├── requirements.txt              # full stack (training + deep learning)
-├── requirements-dashboard.txt    # lightweight subset for cloud deployment
+├── requirements.txt              # lightweight runtime (deployed app + CI auto-install this)
+├── requirements-full.txt         # full stack (training, deep learning, notebook, tests)
 ├── .streamlit/config.toml        # dashboard server/theme config (committed, no secrets)
 ├── notebook/
 │   └── demand_forecasting.ipynb  # deep guided-story notebook
@@ -102,8 +102,8 @@ python -m venv .venv
 # Windows:  .venv\Scripts\activate
 # macOS/Linux:  source .venv/bin/activate
 
-# 2. Install the full dependency stack
-pip install -r requirements.txt
+# 2. Install the full dependency stack (training, deep learning, notebook, tests)
+pip install -r requirements-full.txt
 
 # 3. Put the real data in place (git-ignored)
 #    Download FHVHV Parquet from the NYC TLC page above into data/,
@@ -204,16 +204,17 @@ Community Cloud account.** Steps:
 
 1. Push this repository to GitHub (public).
 2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
-3. Click **New app** and select this repository and branch.
+3. Click **New app** → **Deploy a public app from GitHub**, and select this
+   repository and the `main` branch.
 4. Set **Main file path** to `dashboard/app.py`.
-5. Under **Advanced settings**, set the **Python version** to 3.10 or 3.11 and set
-   the **requirements file** to **`requirements-dashboard.txt`**.
-   - Why: the dashboard itself only needs pandas, pyarrow, matplotlib, statsmodels,
-     and streamlit. The full `requirements.txt` pulls in heavy training packages
-     (tensorflow, prophet, xgboost) that can exceed the free tier's build/memory
-     limits. Use the full file only for local training and the notebook.
-6. Click **Deploy**. Streamlit installs the dependencies and serves the app at a
-   public `*.streamlit.app` URL.
+5. (Optional) Under **Advanced settings**, set the **Python version** to 3.11.
+6. Click **Deploy**. Streamlit automatically installs from the root
+   **`requirements.txt`** — which is intentionally lightweight (pandas, pyarrow,
+   matplotlib, statsmodels, streamlit), so the free-tier build stays fast. The app
+   reads the committed prepared artifacts and fits only the fast Holt-Winters model
+   at runtime, so it never needs the heavy training packages in
+   `requirements-full.txt` (tensorflow, prophet, xgboost). Streamlit then serves the
+   app at a public `*.streamlit.app` URL.
 
 The committed `.streamlit/config.toml` supplies sensible server and theme settings
 (headless mode, a 50 MB upload cap for the *Upload & analyze* mode, and a
