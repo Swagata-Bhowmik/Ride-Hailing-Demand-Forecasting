@@ -1,0 +1,20 @@
+# Keep GitHub's language statistics honest.
+#
+# The repository's real work is Python (src/, scripts/, tests/) and the Jupyter
+# notebook. The HTML files below are GENERATED, self-contained report artifacts
+# (built by scripts/build_dashboard_html.py) plus a tiny redirect landing page -
+# not hand-written source. dashboard.html alone is ~4.6 MB because it embeds the
+# interactive charting engine, which would otherwise dominate the language bar and
+# mislabel the project as "HTML". Marking them as generated excludes them from the
+# language breakdown (and collapses them in diffs).
+
+dashboard.html    linguist-generated=true
+index.html        linguist-generated=true
+
+# Prepared-data artifacts are data, not code - keep them out of language stats too.
+dashboard/demand_series.csv    linguist-generated=true
+dashboard/model_results.json   linguist-generated=true
+
+# Notebooks are the real analysis - make sure they count as source (not detectable
+# as "generated") so the language bar reflects Python + Jupyter Notebook.
+*.ipynb    linguist-detectable=true
