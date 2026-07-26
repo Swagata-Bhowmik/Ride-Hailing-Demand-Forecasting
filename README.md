@@ -1,17 +1,40 @@
 # 🚕 Ride-Hailing Demand Forecasting
 
-Forecasting ride-hailing demand — **how much, when, and where** — on real,
-official **NYC TLC** trip data, so a platform can position drivers *ahead of need*
-and cut both rider wait time and driver idle time.
+> Forecasting ride-hailing demand — **how much, when, and where** — on real,
+> official **NYC TLC** trip data, so a platform can position drivers *ahead of need*
+> and cut both rider wait time and driver idle time.
 
-The project runs the full data-science lifecycle end to end: validate real data →
+[![Live app](https://img.shields.io/badge/🚀_Live_app-Open_the_dashboard-FF4B4B?style=for-the-badge)](https://ride-hailing-demand-forecasting-swagata-bhowmik.streamlit.app/)
+&nbsp;
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+&nbsp;
+![Data](https://img.shields.io/badge/Data-Real_NYC_TLC_(247M+_trips)-06b6d4?style=for-the-badge)
+&nbsp;
+![Tests](https://img.shields.io/badge/Tests-131_passing-22c55e?style=for-the-badge)
+
+The project runs the **full data-science lifecycle** end to end: validate real data →
 explore it → prepare it → compare a broad set of forecasting models honestly →
-select the best → translate the forecast into a business recommendation → deliver
-it as a deep notebook, an interactive dashboard, free-tier automation, and a live
-public deployment.
+select the best → translate the forecast into a business recommendation → and deliver
+it four ways (below).
 
 > **Golden rule:** only real public data is used, nothing is fabricated, and every
 > reported number is validated against the raw data before it is shown.
+
+---
+
+## 🔎 Explore this project — four ways, pick any
+
+| | Deliverable | What it is |
+|---|---|---|
+| 🌐 | **[Live interactive app](https://ride-hailing-demand-forecasting-swagata-bhowmik.streamlit.app/)** | A hosted Streamlit dashboard — click and explore, **no setup**. Includes an **upload-your-own-data → live forecast** mode. |
+| 📄 | **[`dashboard.html`](dashboard.html)** | A single, self-contained **offline report** — download and double-click; opens in any browser with no Python or internet. |
+| 📓 | **[`notebook/demand_forecasting.ipynb`](notebook/demand_forecasting.ipynb)** | The deep, guided **technical notebook** — every step explained and run, with real charts, tables and numbers saved inline. |
+| 📖 | **This README** | The whole story in one read — understand the project **without opening anything**. |
+
+**Headline result:** across a broad candidate set, the honest holdout winner is a
+**Holt-Winters** baseline at **3.74% MAPE** on system-wide daily demand — deep-learning
+models were trained too and reported honestly, even though they underperformed on this
+short daily series ([full scoreboard below](#real-holdout-results)).
 
 ---
 
@@ -221,8 +244,7 @@ The committed `.streamlit/config.toml` supplies sensible server and theme settin
 taxi-yellow theme). Secrets are **not** stored there — they belong in
 `.streamlit/secrets.toml`, which is git-ignored.
 
-> After deploying, add the live URL here:
-> **Live dashboard:** _`https://<your-app>.streamlit.app`_ (add after deploy)
+> **🌐 Live dashboard:** https://ride-hailing-demand-forecasting-swagata-bhowmik.streamlit.app/
 
 ---
 
