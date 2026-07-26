@@ -172,13 +172,21 @@ system-wide total-daily-demand level (~700k trips/day):
 | VAR | 32,614 | 47,765 | 4.47% |
 | SARIMA | 46,440 | 56,689 | 6.49% |
 | SARIMAX | 46,440 | 56,689 | 6.49% |
-| LSTM / GRU | — | — | excluded where `tensorflow` is not installed |
+| LSTM | 53,935 | 75,907 | 7.23% |
+| GRU | 88,056 | 111,740 | 12.01% |
 
 The simple **Holt-Winters** baseline is the most accurate here — an honest result:
 a well-tuned baseline beating heavier models is common on a clean, strongly-weekly
-daily series, and it is reported rather than hidden. Carry-forward set:
+daily series, and it is reported rather than hidden. The deep-learning models
+(**LSTM, GRU**) underperform the classical ones, which is expected on a short daily
+series (≈335 training days per borough): recurrent nets are data-hungry, so they
+underfit here — again, reported rather than hidden. Carry-forward set:
 Holt-Winters, Prophet, XGBoost, VAR, SARIMA. These real numbers are persisted to
 `dashboard/model_results.json` and rendered by both dashboards.
+
+> LSTM/GRU require `tensorflow`, which currently has no build for Python 3.14. They
+> were trained in a separate Python 3.11 environment via
+> `scripts/add_deep_learning.py`, which merges their real results into the artifact.
 
 The selected forecast is then turned into a **driver-positioning recommendation**
 with a **quantified impact** (rider wait-minutes and driver idle-minutes saved),

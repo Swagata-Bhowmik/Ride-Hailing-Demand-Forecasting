@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-26T05:33:56+00:00",
+  "generated_at": "2026-07-26T07:19:48+00:00",
   "evaluation_level": "total_daily_demand",
   "source": "data/demand_series.parquet (real NYC TLC FHVHV)",
   "window": "2025-05-01 -> 2026-04-30",
@@ -282,13 +282,73 @@
     },
     {
       "name": "LSTM",
-      "values": null,
-      "excluded_reason": "tensorflow is not available, so the LSTM model is excluded: ModuleNotFoundError(\"No module named 'tensorflow'\"). Install 'tensorflow' to enable it."
+      "values": [
+        646066.7376647525,
+        691305.1596588785,
+        738042.0547144244,
+        759449.080581381,
+        703607.2468157281,
+        629150.4204675717,
+        607422.0016010414,
+        629302.9308791797,
+        667074.0493590862,
+        705096.8283034569,
+        722920.5226812998,
+        695503.3988705109,
+        641428.071489388,
+        612250.1643235442,
+        620092.791588631,
+        647626.6712048494,
+        679171.9469025419,
+        698380.4759090119,
+        687162.9901705716,
+        648945.0087067804,
+        619151.075548829,
+        617613.1659154978,
+        636665.4663833778,
+        663156.181279577,
+        683265.0817363022,
+        681866.6900504893,
+        655824.4462903533,
+        628325.33673912,
+        620885.7600336535,
+        633223.6249944647
+      ]
     },
     {
       "name": "GRU",
-      "values": null,
-      "excluded_reason": "tensorflow is not available, so the GRU model is excluded: ModuleNotFoundError(\"No module named 'tensorflow'\"). Install 'tensorflow' to enable it."
+      "values": [
+        636610.9090192859,
+        674130.9906457129,
+        718889.3031394691,
+        761960.2866928448,
+        689376.2337253817,
+        594158.9528417401,
+        579993.3086468477,
+        604087.8740679031,
+        633261.1816594996,
+        669147.3915891553,
+        703017.9065982607,
+        664188.7563487086,
+        583977.8183959611,
+        558872.5820374337,
+        577255.545449743,
+        602627.3413898845,
+        631404.3714236706,
+        660060.0040486031,
+        643096.2432918613,
+        576888.0326993754,
+        543747.9503711539,
+        554358.6462464815,
+        575802.4214951262,
+        601211.5343097751,
+        628015.9855726473,
+        623668.9598758348,
+        570275.6111479076,
+        533608.8858888688,
+        537632.7432734353,
+        556554.6343349863
+      ]
     }
   ],
   "carry_forward": [
@@ -298,5 +358,5 @@
     "VAR",
     "SARIMA"
   ],
-  "carry_forward_justification": "Carrying forward 5 model(s) for deep explanation (Requirement 6.6 target: 3-5). 6 model(s) were scored on the Holdout_Set; models are ranked by MAE ascending, with RMSE then MAPE as tie-breakers (lower is better).\n  1. Holt-Winters (MAE=2.68e+04)\n  2. Prophet (MAE=3.059e+04)\n  3. XGBoost (MAE=3.218e+04)\n  4. VAR (MAE=3.261e+04)\n  5. SARIMA (MAE=4.644e+04)\nSelected the top 5 of 6 scored models by reported error metrics."
+  "carry_forward_justification": "Carrying forward 5 model(s) for deep explanation (Requirement 6.6 target: 3-5). 8 model(s) were scored on the Holdout_Set; models are ranked by MAE ascending, with RMSE then MAPE as tie-breakers (lower is better).\n  1. Holt-Winters (MAE=2.68e+04)\n  2. Prophet (MAE=3.059e+04)\n  3. XGBoost (MAE=3.218e+04)\n  4. VAR (MAE=3.261e+04)\n  5. SARIMA (MAE=4.644e+04)\nSelected the top 5 of 8 scored models by reported error metrics."
 }

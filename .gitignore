@@ -9,6 +9,7 @@ PROJECT2_BRIEF_Ride_Hailing_Forecasting.md
 
 # --- Virtual environments ---
 .venv/
+.venv-tf/
 venv/
 env/
 ENV/
