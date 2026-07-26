@@ -1,0 +1,37 @@
+# Streamlit configuration for the Ride-Hailing Demand Forecasting dashboard.
+#
+# This file is read automatically by Streamlit both locally (`streamlit run
+# dashboard/app.py`) and when the app is deployed to Streamlit Community Cloud.
+# It is safe to commit: it contains NO secrets. Secrets belong in
+# `.streamlit/secrets.toml`, which is git-ignored.
+#
+# On Streamlit Community Cloud these server settings are applied automatically,
+# so a visitor opening the public URL needs no local setup (Requirement 11.3).
+
+[server]
+# Run without opening a local browser tab / without usage-stats prompts; this is
+# how hosted environments expect the server to behave.
+headless = true
+# Cloud hosts terminate TLS and proxy to the app, so CORS/XSRF juggling is left at
+# safe defaults for the managed platform.
+enableCORS = false
+enableXsrfProtection = true
+# Cap upload size (MB) for the "Upload & analyze" mode so a huge file can't
+# exhaust the free-tier container's memory.
+maxUploadSize = 50
+
+[browser]
+# Don't send anonymous usage statistics.
+gatherUsageStats = false
+
+[theme]
+# A light, NYC-taxi-yellow accent so the hosted app looks intentional.
+base = "light"
+primaryColor = "#F5C518"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F5F5"
+textColor = "#262730"
+
+[runner]
+# Show a friendly message instead of a raw traceback if a rerun hits an error.
+fastReruns = true

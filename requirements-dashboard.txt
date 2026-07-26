@@ -1,0 +1,27 @@
+# Lightweight dependency set for deploying ONLY the Streamlit dashboard to
+# Streamlit Community Cloud (Requirement 11).
+#
+# Why this file exists:
+#   The full `requirements.txt` includes heavy training/deep-learning packages
+#   (tensorflow, prophet, xgboost) that the *dashboard* does not import at runtime.
+#   On the free tier those large wheels can blow past the container's memory/build
+#   limits or time out the build. The dashboard's storytelling sections, EDA charts,
+#   evaluation table, and forecast plots only need the packages below.
+#
+# How to use it:
+#   In the Streamlit Community Cloud app settings, point "requirements file" at
+#   `requirements-dashboard.txt` instead of `requirements.txt`. For full local model
+#   training (notebook / pipeline), install the complete `requirements.txt`.
+
+# --- Data handling ---
+pandas>=2.0,<3.0
+pyarrow>=14.0,<18.0
+
+# --- Visualization (EDA charts, forecast-vs-actual plots) ---
+matplotlib>=3.7,<4.0
+
+# --- Statistical diagnostics used by the EDA section (ADF, decomposition) ---
+statsmodels>=0.14,<0.15
+
+# --- Dashboard framework ---
+streamlit>=1.30,<2.0

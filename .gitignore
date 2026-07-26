@@ -1,0 +1,45 @@
+# --- Data files (real NYC TLC Parquet lives here, never committed) ---
+# Ignore all data contents but keep the directory in the repo via .gitkeep.
+data/*
+!data/.gitkeep
+*.parquet
+
+# --- Project brief / personal planning files ---
+PROJECT2_BRIEF_Ride_Hailing_Forecasting.md
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Secrets / credentials ---
+.env
+.env.*
+*.pem
+*.key
+secrets.*
+.streamlit/secrets.toml
+
+# --- Python bytecode / caches ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# --- Notebook checkpoints ---
+.ipynb_checkpoints/
+
+# --- Build / distribution artifacts ---
+build/
+dist/
+*.egg-info/
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
