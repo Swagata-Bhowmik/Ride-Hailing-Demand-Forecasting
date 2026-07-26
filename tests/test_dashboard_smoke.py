@@ -260,10 +260,12 @@ def test_section_renders(label):
     # Must not raise.
     render(scope)
 
-    # When using the fake Streamlit, assert the section actually rendered output
-    # (every section starts with a header). With a real Streamlit this is a no-op.
+    # When using the fake Streamlit, assert the section actually rendered output.
+    # Every section renders a styled header + intro via st.markdown (plus charts,
+    # tables, KPIs), so a `markdown` call is the reliable signal that it produced
+    # output. With a real Streamlit this is a no-op.
     if isinstance(_ST, _FakeStreamlit):
-        assert "header" in _ST.calls, f"section '{label}' produced no header output"
+        assert "markdown" in _ST.calls, f"section '{label}' produced no output"
 
 
 # --------------------------------------------------------------------------- #
