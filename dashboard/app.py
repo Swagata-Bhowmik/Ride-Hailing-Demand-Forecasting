@@ -44,6 +44,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 # --- Make the project root importable so ``import src...`` works when the app is
@@ -299,77 +300,290 @@ def _model_results_notice(is_real: bool) -> None:
 
 
 # =============================================================================
+# Visual theme + reusable colourful components (mirrors dashboard.html)
+# =============================================================================
+
+#: Vibrant categorical palette shared by cards and chart traces.
+PALETTE = [
+    "#6366f1", "#06b6d4", "#f43f5e", "#22c55e",
+    "#f59e0b", "#a855f7", "#ec4899", "#3b82f6",
+]
+
+_THEME_CSS = """
+<style>
+:root { --ink:#0f172a; --muted:#64748b; }
+.stApp { background: linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%); }
+.block-container { padding-top: 1.4rem; max-width: 1200px; }
+h1,h2,h3,h4 { font-family:'Inter','Segoe UI',system-ui,sans-serif; color:var(--ink); letter-spacing:-.01em; }
+
+/* Hero banner */
+.hero { border-radius:18px; padding:26px 30px; margin:2px 0 18px;
+  background:linear-gradient(120deg,#6366f1 0%,#8b5cf6 45%,#ec4899 100%);
+  color:#fff; box-shadow:0 12px 34px rgba(99,102,241,.28); }
+.hero h1 { color:#fff; margin:0 0 6px; font-size:30px; }
+.hero p { color:#eef2ff; margin:0; font-size:15px; max-width:70ch; }
+.hero .badge { display:inline-block; margin-top:12px; padding:4px 12px; border-radius:999px;
+  font-size:12px; font-weight:700; background:rgba(255,255,255,.22); color:#fff;
+  border:1px solid rgba(255,255,255,.4); }
+
+/* Section header */
+.sec-head { display:flex; align-items:center; gap:12px; margin:6px 0 10px; }
+.sec-emoji { width:44px; height:44px; border-radius:12px; display:flex; align-items:center;
+  justify-content:center; font-size:22px; color:#fff; box-shadow:0 6px 16px rgba(15,23,42,.16); }
+.sec-head h2 { margin:0; font-size:23px; }
+.lead { font-size:16px; color:#334155; line-height:1.6; margin:6px 0 14px;
+  padding-left:14px; border-left:4px solid #6366f1; }
+
+/* Cards */
+.cards { display:flex; flex-wrap:wrap; gap:14px; margin:10px 0 18px; }
+.card { flex:1 1 240px; min-width:220px; background:#fff; border-radius:16px; padding:16px 18px;
+  border:1px solid #eef2f7; border-top:4px solid var(--accent,#6366f1);
+  box-shadow:0 6px 18px rgba(15,23,42,.06); transition:transform .15s ease, box-shadow .15s ease; }
+.card:hover { transform:translateY(-4px); box-shadow:0 16px 30px rgba(15,23,42,.12); }
+.card .ic { width:38px; height:38px; border-radius:10px; display:flex; align-items:center;
+  justify-content:center; font-size:20px; margin-bottom:8px; }
+.card h4 { margin:2px 0 8px; font-size:16px; }
+.card p { margin:0; color:#475569; font-size:14px; line-height:1.55; }
+.card ul { margin:0; padding-left:2px; list-style:none; }
+.card li { position:relative; padding-left:20px; margin:4px 0; color:#475569; font-size:14px; }
+.card li:before { content:'\\2713'; position:absolute; left:0; color:var(--accent,#6366f1); font-weight:800; }
+
+/* KPI tiles (custom + st.metric restyle) */
+.kpis { display:flex; flex-wrap:wrap; gap:14px; margin:8px 0 18px; }
+.kpi { flex:1 1 180px; min-width:150px; background:#fff; border-radius:16px; padding:16px 18px;
+  border:1px solid #eef2f7; box-shadow:0 6px 18px rgba(15,23,42,.06);
+  border-left:5px solid var(--accent,#6366f1); }
+.kpi .val { font-size:26px; font-weight:800; color:var(--accent,#6366f1); line-height:1.1; }
+.kpi .lab { font-size:12.5px; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:.04em; }
+[data-testid="stMetric"] { background:#fff; border-radius:14px; padding:14px 16px;
+  border:1px solid #eef2f7; border-left:5px solid #6366f1; box-shadow:0 6px 16px rgba(15,23,42,.06); }
+[data-testid="stMetricValue"] { color:#4338ca; font-weight:800; }
+
+/* Flow diagram */
+.flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; margin:12px 0 18px; }
+.step { flex:1 1 130px; min-width:120px; background:#fff; border-radius:14px; padding:12px;
+  text-align:center; border:1px solid #eef2f7; border-bottom:4px solid var(--accent,#6366f1);
+  box-shadow:0 6px 16px rgba(15,23,42,.06); transition:transform .15s ease; }
+.step:hover { transform:translateY(-4px); }
+.step .se { font-size:22px; } .step .st { font-weight:700; font-size:13.5px; margin-top:4px; color:#1e293b; }
+.step .ss { font-size:11.5px; color:var(--muted); margin-top:2px; }
+
+/* Pills */
+.pills { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 4px; }
+.pill { padding:6px 13px; border-radius:999px; font-size:13px; font-weight:700; color:#fff;
+  box-shadow:0 4px 12px rgba(15,23,42,.12); }
+
+section[data-testid="stSidebar"] { background:linear-gradient(180deg,#111827,#1f2937); }
+section[data-testid="stSidebar"] * { color:#e5e7eb; }
+</style>
+"""
+
+
+def _inject_theme() -> None:
+    st.markdown(_THEME_CSS, unsafe_allow_html=True)
+
+
+def _hero(title: str, subtitle: str, badge: str) -> None:
+    st.markdown(
+        f'<div class="hero"><h1>{title}</h1><p>{subtitle}</p>'
+        f'<span class="badge">{badge}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _section_header(emoji: str, title: str, accent: str) -> None:
+    st.markdown(
+        f'<div class="sec-head"><div class="sec-emoji" style="background:{accent}">{emoji}</div>'
+        f'<h2>{title}</h2></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _lead(text: str) -> None:
+    st.markdown(f'<div class="lead">{text}</div>', unsafe_allow_html=True)
+
+
+def _card(emoji: str, title: str, *, bullets=None, body: str = "", accent: str = "#6366f1") -> str:
+    if bullets:
+        inner = "<ul>" + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>"
+    else:
+        inner = f"<p>{body}</p>"
+    return (
+        f'<div class="card" style="--accent:{accent}">'
+        f'<div class="ic" style="background:{accent}1a;color:{accent}">{emoji}</div>'
+        f'<h4>{title}</h4>{inner}</div>'
+    )
+
+
+def _cards(cards) -> None:
+    st.markdown(f'<div class="cards">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+
+def _kpis(items) -> None:
+    """items: iterable of (label, value, accent)."""
+    tiles = "".join(
+        f'<div class="kpi" style="--accent:{accent}"><div class="val">{value}</div>'
+        f'<div class="lab">{label}</div></div>'
+        for label, value, accent in items
+    )
+    st.markdown(f'<div class="kpis">{tiles}</div>', unsafe_allow_html=True)
+
+
+def _flow(steps) -> None:
+    """steps: iterable of (emoji, title, subtitle, accent)."""
+    nodes = "".join(
+        f'<div class="step" style="--accent:{accent}"><div class="se">{e}</div>'
+        f'<div class="st">{t}</div><div class="ss">{s}</div></div>'
+        for e, t, s, accent in steps
+    )
+    st.markdown(f'<div class="flow">{nodes}</div>', unsafe_allow_html=True)
+
+
+def _pills(names) -> None:
+    chips = "".join(
+        f'<span class="pill" style="background:{PALETTE[i % len(PALETTE)]}">{n}</span>'
+        for i, n in enumerate(names)
+    )
+    st.markdown(f'<div class="pills">{chips}</div>', unsafe_allow_html=True)
+
+
+# =============================================================================
+# Interactive Plotly chart builders
+# =============================================================================
+
+def _plotly_theme(fig: go.Figure, title: str) -> go.Figure:
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=17, color="#4338ca")),
+        template="plotly_white", height=430,
+        font=dict(family="Inter, Segoe UI, sans-serif", size=13, color="#334155"),
+        margin=dict(l=55, r=25, t=55, b=45), hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", colorway=PALETTE,
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="#eef2ff", zeroline=False)
+    fig.update_yaxes(showgrid=True, gridcolor="#eef2ff", zeroline=False)
+    return fig
+
+
+def _fig_demand_over_time(series: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    for i, region in enumerate(pd.unique(series[REGION_COLUMN])):
+        sub = series[series[REGION_COLUMN] == region].sort_values(PERIOD_COLUMN)
+        fig.add_trace(go.Scatter(
+            x=sub[PERIOD_COLUMN], y=sub[DEMAND_COLUMN], mode="lines", name=str(region),
+            line=dict(width=2.2, color=PALETTE[i % len(PALETTE)]),
+            hovertemplate="%{x|%Y-%m-%d}<br>%{fullData.name}: %{y:,} trips<extra></extra>",
+        ))
+    fig.update_yaxes(title_text="Demand (trips)")
+    return _plotly_theme(fig, "Demand over time by region")
+
+
+def _fig_model_comparison(table: pd.DataFrame) -> go.Figure:
+    scored = table[table["mae"].notna()].sort_values("mae")
+    models = scored["model_name"].astype(str).tolist()
+    fig = go.Figure()
+    for metric, color in (("mae", "#6366f1"), ("rmse", "#06b6d4"), ("mape", "#f43f5e")):
+        fig.add_trace(go.Bar(x=models, y=scored[metric], name=metric.upper(), marker_color=color,
+                             hovertemplate="%{x}<br>" + metric.upper() + ": %{y:.3f}<extra></extra>"))
+    fig.update_layout(barmode="group")
+    fig.update_yaxes(title_text="Error (lower is better)")
+    return _plotly_theme(fig, "Model comparison - error metrics (lower is better)")
+
+
+def _fig_forecast_vs_actual(actual, results, index) -> go.Figure:
+    actual_arr = np.asarray(actual, dtype=float).ravel()
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=list(index), y=actual_arr, mode="lines", name="Actual",
+                             line=dict(color="#0f172a", width=3.4),
+                             hovertemplate="%{x|%Y-%m-%d}<br>Actual: %{y:,.0f}<extra></extra>"))
+    ci = 0
+    for r in results:
+        fc = getattr(r, "forecast", None)
+        if fc is None or getattr(fc, "values", None) is None:
+            continue
+        vals = np.asarray(fc.values, dtype=float).ravel()
+        if vals.size != actual_arr.size:
+            continue
+        fig.add_trace(go.Scatter(x=list(index), y=vals, mode="lines", name=str(r.model_name),
+                                 line=dict(width=1.8, color=PALETTE[ci % len(PALETTE)]), opacity=0.9,
+                                 hovertemplate="%{x|%Y-%m-%d}<br>%{fullData.name}: %{y:,.0f}<extra></extra>"))
+        ci += 1
+    fig.update_yaxes(title_text="Demand (trips)")
+    return _plotly_theme(fig, "Forecast vs. actual on the holdout")
+
+
+# =============================================================================
 # Story sections (Requirement 9.2) - each is a dispatched render function
 # =============================================================================
 
 
 def render_business_problem(scope: ScopeConfig) -> None:
     """Section 1: the business problem the project solves (Requirement 9.2)."""
-    st.header("The business problem")
-    st.markdown(
-        """
-Ride-hailing demand is spiky in **time** and **space**: some hours and some
-neighbourhoods surge while others go quiet. When drivers are not where riders will
-be, two costs appear at once:
-
-- **Riders wait longer** (worse experience, cancelled trips, lost revenue).
-- **Drivers sit idle** (lower earnings, lower platform utilisation).
-
-**The goal of this project is to forecast demand - how much, when, and where -**
-so a platform can *position drivers ahead of need*, cutting both rider wait time
-and driver idle time.
-
-We frame it as a full data-science lifecycle: validate real data, explore it,
-prepare it, compare a broad set of forecasting models honestly, pick the best, and
-translate that forecast into an operational driver-positioning recommendation.
-        """
+    _section_header("🎯", "The business problem", "#6366f1")
+    _lead(
+        "Our goal: <strong>forecast demand - how much, when, and where -</strong> so a "
+        "platform can position drivers <em>ahead</em> of need, cutting both rider wait "
+        "time and driver idle time."
     )
-    st.subheader("Fixed forecasting scope")
-    st.markdown(
-        f"""
-The scope is fixed up front and read from a single source of truth
-(`src/config.ScopeConfig`) so every stage uses the same values:
-
-- **Time grain:** `{scope.time_grain}`
-- **Geographic grain:** `{scope.geographic_grain}`
-- **Analysis window:** `{scope.window_start}` → `{scope.window_end}`
-  ({scope.window_months} months)
-- **Holdout reserved for evaluation:** {scope.holdout_periods} periods
-        """
-    )
+    _cards([
+        _card("⏱️", "Spiky in time", bullets=[
+            "Some hours surge, others go quiet.",
+            "Rush hours, weekends and events all shift demand.",
+        ], accent="#6366f1"),
+        _card("🗺️", "Spiky in space", bullets=[
+            "Some neighbourhoods boom while others sit idle.",
+            "Manhattan behaves nothing like Staten Island.",
+        ], accent="#06b6d4"),
+        _card("💸", "Two costs at once", bullets=[
+            "Riders wait longer when no driver is near.",
+            "Drivers sit idle in the wrong place.",
+        ], accent="#f43f5e"),
+    ])
+    st.markdown("#### 🔒 Fixed forecasting scope")
+    st.caption("Read from one source of truth (`src/config.ScopeConfig`) so every stage uses identical values.")
+    _kpis([
+        ("Time grain", scope.time_grain, "#22c55e"),
+        ("Geographic grain", scope.geographic_grain, "#f59e0b"),
+        ("Analysis window", f"{scope.window_months} months", "#a855f7"),
+        ("Holdout", f"{scope.holdout_periods} periods", "#3b82f6"),
+    ])
 
 
 def render_data_source(scope: ScopeConfig) -> None:
     """Section 2: the data source and its honest limitations (Requirement 9.2)."""
-    st.header("Data source & honest limitations")
-    st.markdown(
-        """
-**Source: official [NYC TLC Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page)**,
-specifically the **For-Hire Vehicle High Volume (FHVHV)** feed - the Uber/Lyft-style
-rides - published by the NYC Taxi & Limousine Commission in Parquet format.
-
-Only **real, public** data is used. Demand is defined as the **count of trips** per
-`(period, region)`, where region is a borough (via the official taxi-zone lookup).
-        """
+    _section_header("🗽", "Data source & honest limitations", "#06b6d4")
+    _lead(
+        "Source: <strong>official <a href='https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page' "
+        "target='_blank'>NYC TLC Trip Record Data</a></strong> - the For-Hire Vehicle "
+        "High-Volume (FHVHV) feed (Uber/Lyft-style rides), published in Parquet by the "
+        "NYC Taxi &amp; Limousine Commission. Only real, public data - "
+        "<strong>nothing is fabricated</strong>."
     )
-    st.subheader("Honest limitations")
-    st.markdown(
-        """
-- **It is NYC, not India.** The models are trained on New York boroughs. The
-  *method* generalises to Ola/Uber/Rapido (see the India section), but the specific
-  numbers do not transfer directly.
-- **Trip counts are a proxy for demand.** The TLC feed records *completed* trips, so
-  unmet demand (riders who gave up, or requests with no driver) is not directly
-  observed.
-- **Borough/daily grain is coarse.** It suits stable multivariate forecasting but
-  hides intraday and neighbourhood-level surges that matter operationally.
-- **Exogenous drivers are partial.** Weather, events, and surge pricing are not in
-  the base feed; where used they are added as candidate explanatory variables.
-- **Every reported number is validated** against the raw data before it is shown -
-  nothing is fabricated. Where a limitation cannot be resolved, it is documented
-  rather than hidden.
-        """
-    )
+    st.markdown("#### 🧾 What \"demand\" means here")
+    _cards([
+        _card("📊", "Trip count", body="Demand = count of trips per (period, region).", accent="#6366f1"),
+        _card("🗺️", "Region = borough", body="Mapped via the official taxi-zone lookup.", accent="#06b6d4"),
+        _card("✅", "Validated", body="Every reported number is checked against the raw data first.", accent="#22c55e"),
+    ])
+    st.markdown("#### ⚖️ Honest limitations")
+    _cards([
+        _card("🌍", "NYC, not India", bullets=[
+            "The method generalises.",
+            "The specific numbers do not transfer directly.",
+        ], accent="#06b6d4"),
+        _card("📈", "Trips ≈ demand", bullets=[
+            "Trip counts are a proxy for true demand.",
+            "Riders who gave up aren't observed.",
+        ], accent="#f43f5e"),
+        _card("🔬", "Coarse grain", bullets=[
+            "Borough/daily hides intraday surges.",
+            "Neighbourhood spikes are smoothed out.",
+        ], accent="#f59e0b"),
+        _card("🌦️", "Partial drivers", bullets=[
+            "Weather, events, surge not in the base feed.",
+            "Known extensions, not silent gaps.",
+        ], accent="#a855f7"),
+    ])
     st.caption(
         f"Analysis window: {scope.window_start} → {scope.window_end} "
         f"({scope.window_months} months of FHVHV records)."
@@ -378,11 +592,10 @@ Only **real, public** data is used. Demand is defined as the **count of trips** 
 
 def render_eda(scope: ScopeConfig) -> None:
     """Section 3: the EDA findings (Requirement 9.2), reusing ``src.eda``."""
-    st.header("EDA findings")
-    st.markdown(
-        "Exploring the demand series *before* modelling: its shape over time, its "
-        "seasonality, and its stationarity. Charts and their plain-language readings "
-        "come straight from the reusable `src.eda` functions."
+    _section_header("🔍", "EDA findings", "#22c55e")
+    _lead(
+        "Before modelling we study the series' shape, seasonality and stationarity. "
+        "The first chart is interactive - hover for values, drag to zoom."
     )
 
     series, is_real = get_demand_series(scope)
@@ -391,12 +604,33 @@ def render_eda(scope: ScopeConfig) -> None:
     # Lazy import: src.eda pulls in statsmodels/matplotlib, kept out of module import.
     from src.eda import adf_test, plot_demand_series, seasonal_decompose_demand
 
-    st.subheader("Demand over time (Requirement 3.1)")
-    ts = plot_demand_series(series, scope)
-    st.pyplot(ts.figure)
-    st.markdown(f"**What this shows:** {ts.interpretation}")
+    total = int(series[DEMAND_COLUMN].sum())
+    _kpis([
+        ("Total demand", f"{total:,}", "#6366f1"),
+        ("Regions", f"{series[REGION_COLUMN].nunique()}", "#06b6d4"),
+        ("Distinct periods", f"{series[PERIOD_COLUMN].nunique()}", "#22c55e"),
+        ("Rows", f"{len(series):,}", "#f59e0b"),
+    ])
 
-    st.subheader("Seasonal decomposition (Requirement 3.2)")
+    st.plotly_chart(_fig_demand_over_time(series), use_container_width=True)
+    st.markdown(f"**What this shows:** {plot_demand_series(series, scope).interpretation}")
+
+    _cards([
+        _card("📆", "Weekly rhythm", bullets=[
+            "Demand rises and falls on a clear 7-day cycle.",
+            "Weekdays and weekends have distinct shapes.",
+        ], accent="#22c55e"),
+        _card("📈", "Mild trend", bullets=[
+            "A gentle drift over the window.",
+            "Models must capture level + trend together.",
+        ], accent="#6366f1"),
+        _card("🏙️", "Scale gap", bullets=[
+            "Manhattan dominates total volume.",
+            "Staten Island is a fraction of it.",
+        ], accent="#f59e0b"),
+    ])
+
+    st.markdown("#### 🔬 Seasonal decomposition")
     try:
         decomp = seasonal_decompose_demand(series, period=7)
         st.pyplot(decomp.figure)
@@ -404,7 +638,7 @@ def render_eda(scope: ScopeConfig) -> None:
     except ValueError as exc:
         st.warning(f"Not enough history to decompose seasonality: {exc}")
 
-    st.subheader("Stationarity - Augmented Dickey-Fuller test (Requirement 3.3)")
+    st.markdown("#### 📉 Stationarity - Augmented Dickey-Fuller test")
     try:
         adf = adf_test(series)
         col1, col2 = st.columns(2)
@@ -417,30 +651,22 @@ def render_eda(scope: ScopeConfig) -> None:
 
 def render_data_preparation(scope: ScopeConfig) -> None:
     """Section 4: the data preparation approach (Requirement 9.2)."""
-    st.header("Data preparation")
-    st.markdown(
-        """
-Raw trip records are reshaped into a validated forecasting dataset by the pure
-functions in `src/preparation.py`. Every step is validated against ground truth
-(the "golden rule"). The pipeline, in order:
-
-1. **Invalid-record handling** (`apply_validity_rules`) - records that fail the
-   validation checks from Phase 1 (e.g. pickups outside the file's month, negative
-   fares/counts) get a *documented* handling rule and a `HandlingLog`.
-2. **Zone → borough mapping** (`map_zones_to_regions`) - `PULocationID` is joined to
-   the official taxi-zone lookup to materialise the borough (Geographic grain).
-3. **Aggregation** (`aggregate_demand`) - trips are counted per `(period, region)`
-   at the daily grain. Totals *reconcile* with the raw valid record count.
-4. **Zero-fill** (`fill_missing_periods`) - every `(period, region)` in the window
-   is present; periods with no trips are explicit **0**, never omitted.
-5. **Lag features** (`add_lag_features`) - `lag_1`, `lag_7`, `lag_14` per region for
-   the machine-learning models (NaN for the first *k* periods of each region).
-        """
+    _section_header("🧹", "Data preparation", "#f59e0b")
+    _lead(
+        "Raw trip records become a validated forecasting dataset via the pure functions "
+        "in <code>src/preparation.py</code>. Order matters - here's the flow:"
     )
+    _flow([
+        ("🚫", "Validate", "invalid records logged, not dropped silently", "#f43f5e"),
+        ("🗺️", "Map zones", "PULocationID → borough via official lookup", "#06b6d4"),
+        ("➕", "Aggregate", "count trips per (period, region)", "#6366f1"),
+        ("0️⃣", "Zero-fill", "empty periods become 0, never missing", "#f59e0b"),
+        ("🔁", "Lag features", "lag_1 / lag_7 / lag_14 for ML models", "#a855f7"),
+    ])
 
     series, is_real = get_demand_series(scope)
     _demo_notice(is_real)
-    st.subheader("Prepared demand series (long format)")
+    st.markdown("#### 📋 Prepared demand series (long format)")
     st.caption(
         "One row per (period, region); `demand` is the trip count and is 0 for "
         "empty periods rather than missing."
@@ -448,118 +674,117 @@ functions in `src/preparation.py`. Every step is validated against ground truth
     st.dataframe(series.head(20), use_container_width=True)
 
     total = int(series[DEMAND_COLUMN].sum())
-    st.markdown(
-        f"- **Rows:** {len(series):,}  \n"
-        f"- **Regions:** {series[REGION_COLUMN].nunique()}  \n"
-        f"- **Distinct periods:** {series[PERIOD_COLUMN].nunique()}  \n"
-        f"- **Total demand (sum of trip counts):** {total:,}"
-    )
+    _kpis([
+        ("Rows", f"{len(series):,}", "#6366f1"),
+        ("Regions", f"{series[REGION_COLUMN].nunique()}", "#06b6d4"),
+        ("Distinct periods", f"{series[PERIOD_COLUMN].nunique()}", "#22c55e"),
+        ("Total demand", f"{total:,}", "#f59e0b"),
+    ])
 
 
 def render_tools(scope: ScopeConfig) -> None:
     """Section 5: the tools and technology used (Requirement 9.2)."""
-    st.header("Tools & technology")
-    st.markdown(
-        """
-The stack is deliberately open-source and reproducible:
-
-| Layer | Tools | Why |
-|---|---|---|
-| Data handling | **pandas**, **pyarrow** | Read the large FHVHV Parquet files; reshape to the demand series. |
-| Visualisation | **matplotlib** | EDA charts and forecast-vs-actual overlays. |
-| Classical / statistical | **statsmodels** (Holt-Winters, SARIMA/SARIMAX, VAR/VARMAX; ADF, decomposition, ACF/PACF) | Baseline + classical + multivariate forecasting and diagnostics. |
-| Modern forecasting | **Prophet** | Trend/seasonality/holiday decomposition out of the box. |
-| Machine learning | **XGBoost** | Gradient-boosted trees on lag features. |
-| Deep learning | **TensorFlow / Keras** (LSTM, GRU) | Sequence models for demand. |
-| Dashboard | **Streamlit** | This interactive storytelling app. |
-| Testing | **pytest**, **Hypothesis** | Example tests + property-based tests for the 13 correctness properties. |
-| Automation / deploy | **GitHub Actions**, **Streamlit Community Cloud** | Free-tier scheduled refresh and public hosting. |
-
-The core logic lives in `src/` as pure, testable functions; both this dashboard
-and the notebook **reuse the same functions**, so the two deliverables can never
-drift apart.
-        """
+    _section_header("🛠️", "Tools & technology", "#3b82f6")
+    _lead(
+        "The stack is deliberately open-source and reproducible. Core logic lives in "
+        "<code>src/</code> as pure, testable functions; this dashboard and the notebook "
+        "reuse the same functions, so the deliverables can never drift."
     )
+    _cards([
+        _card("🐼", "Data handling", bullets=["pandas", "pyarrow"], accent="#6366f1"),
+        _card("📊", "Visualisation", bullets=["matplotlib", "Plotly (this app)"], accent="#06b6d4"),
+        _card("📐", "Classical stats", bullets=["statsmodels", "Holt-Winters, SARIMA, VAR"], accent="#f59e0b"),
+        _card("🔮", "Modern", bullets=["Prophet"], accent="#a855f7"),
+        _card("🌳", "Machine learning", bullets=["XGBoost on lag features"], accent="#22c55e"),
+        _card("🧠", "Deep learning", bullets=["TensorFlow / Keras", "LSTM / GRU"], accent="#ec4899"),
+        _card("🖥️", "Dashboard", bullets=["Streamlit (this app)", "standalone HTML"], accent="#3b82f6"),
+        _card("🧪", "Testing", bullets=["pytest", "Hypothesis (property-based)"], accent="#f43f5e"),
+        _card("🚀", "Automate & deploy", bullets=["GitHub Actions", "Streamlit Cloud"], accent="#f97316"),
+    ])
     st.caption(f"Candidate model set: {', '.join(scope.candidate_models)}.")
 
 
 def render_models(scope: ScopeConfig) -> None:
     """Section 6: the models and method (Requirement 9.2)."""
-    st.header("Models & method")
-    st.markdown(
-        """
-A **broad** set of models is trained so the final choice is justified by evidence,
-not assumption. The candidate set spans every major family:
-
-- **Baseline:** Holt-Winters exponential smoothing.
-- **Classical univariate:** SARIMA (and a SARIMAX exogenous variant).
-- **Multivariate:** VAR / VARMAX - jointly forecasts all boroughs at once.
-- **Modern:** Prophet.
-- **Machine learning:** XGBoost on lag features.
-- **Deep learning:** LSTM (and a GRU variant).
-
-**Method:** each model is trained on everything *except* the most-recent
-`{holdout}`-period **holdout**, which is reserved for out-of-sample scoring. Every
-model forecasts over the *same* holdout so the comparison is fair. Models that
-cannot train on the prepared data are **not silently dropped** - they are recorded
-with a reason and still shown in the comparison.
-        """.format(holdout=scope.holdout_periods)
+    _section_header("🤖", "Models & method", "#ec4899")
+    _lead(
+        "We train a <strong>broad</strong> set of models so the final choice is justified "
+        "by <em>evidence</em>, not assumption. Each card explains what the model is and "
+        "how we use it."
     )
-    st.markdown(
-        "All models share one `Forecaster` interface (`src/models/base.py`), and "
-        "`train_all` trains every candidate, catching per-model failures so one "
-        "failure never aborts the others."
-    )
+    _cards([
+        _card("📉", "Holt-Winters", body="Exponential smoothing baseline - every fancier model must beat it.", accent="#6366f1"),
+        _card("🔁", "SARIMA / SARIMAX", body="Classic seasonal statistical model; SARIMAX adds external regressors.", accent="#06b6d4"),
+        _card("🕸️", "VAR / VARMAX", body="Forecasts all boroughs jointly, learning how they move together.", accent="#a855f7"),
+        _card("🔮", "Prophet", body="Additive trend + seasonality + holidays, robust and easy to read.", accent="#ec4899"),
+        _card("🌳", "XGBoost", body="Gradient-boosted trees on engineered lag features.", accent="#22c55e"),
+        _card("🧠", "LSTM / GRU", body="Recurrent neural nets that learn long-range sequence patterns.", accent="#f59e0b"),
+    ])
+    st.markdown("#### 🧪 The method (fair by design)")
+    _cards([
+        _card("🔒", "Reserved holdout", body=f"Train on everything except the most-recent {scope.holdout_periods}-period holdout.", accent="#3b82f6"),
+        _card("⚖️", "Same yardstick", body="Every model forecasts over the SAME holdout, scored with the same metrics.", accent="#22c55e"),
+        _card("👀", "Nothing hidden", body="Models that can't train are recorded with a reason and still shown.", accent="#f43f5e"),
+    ])
 
 
 def render_results(scope: ScopeConfig) -> None:
     """Section 7: results - model comparison table + forecast plots (R9.3)."""
-    st.header("Results")
-    st.markdown(
-        "The honest scoreboard: the **model-comparison table** (every model, "
-        "including underperformers and excluded ones) and the **forecast-vs-actual** "
-        "overlay on the holdout. Both are produced by the reusable `src.evaluation` "
-        "functions."
+    _section_header("📊", "Results", "#8b5cf6")
+    _lead(
+        "The honest scoreboard: every model (including underperformers and excluded "
+        "ones), scored by the reusable <code>src.evaluation</code> functions on the "
+        "reserved holdout."
     )
 
     actual, index, results, is_real = get_model_results(scope)
     _model_results_notice(is_real)
 
-    st.subheader("Model comparison table (Requirements 6.3, 9.3)")
     table = comparison_table(results)
+    scored = table[table["mae"].notna()].sort_values("mae")
+    if not scored.empty:
+        top = scored.iloc[0]
+        _kpis([
+            ("Best model", str(top["model_name"]), "#22c55e"),
+            ("Best MAE (trips/day)", f"{top['mae']:,.0f}", "#6366f1"),
+            ("Best MAPE", f"{top['mape']:.2f}%", "#f43f5e"),
+            ("Models compared", f"{len(table)}", "#a855f7"),
+        ])
+
+    st.markdown("#### 📊 Error metrics by model (lower is better)")
+    st.plotly_chart(_fig_model_comparison(table), use_container_width=True)
+
+    st.markdown("#### 📋 Full comparison table")
     st.caption(
         "One row per model with the same metric columns (MAE, RMSE, MAPE). Excluded "
-        "models keep the columns as NaN and are flagged, so the comparison is a "
-        "complete, honest census - lower error is better."
+        "models keep the columns as NaN and are flagged - a complete, honest census."
     )
     st.dataframe(
         table.sort_values("mae", na_position="last").reset_index(drop=True),
         use_container_width=True,
     )
 
-    st.subheader("Forecast vs. actual on the holdout (Requirements 6.4, 9.3)")
-    fig = plot_forecast_vs_actual(actual, results, index=index)
-    st.pyplot(fig)
+    st.markdown("#### 📈 Forecast vs. actual on the holdout")
+    st.plotly_chart(_fig_forecast_vs_actual(actual, results, index), use_container_width=True)
     st.caption(
-        "The bold black line is the actual holdout demand; each coloured line is a "
-        "model's forecast. Where a line hugs the black line, that model tracks real "
-        "demand well."
+        "The bold dark line is actual holdout demand; each coloured line is a model's "
+        "forecast. Where a line hugs the dark line, that model tracks demand well."
     )
 
-    st.subheader("Models carried forward (Requirement 6.6)")
+    st.markdown("#### 🏆 Models carried forward")
     names, justification = select_carry_forward(table, return_justification=True)
-    st.markdown(f"**Selected:** {', '.join(names)}")
+    _pills(names)
     st.code(justification)
 
 
 def render_business_insights(scope: ScopeConfig) -> None:
     """Section 8: business insights - the recommendation (Requirement 9.2)."""
-    st.header("Business insights")
-    st.markdown(
-        "The point of the forecast is action. The reusable `src.business` functions "
-        "turn the selected forecast into a **driver-positioning recommendation** and "
-        "quantify the benefit, showing the assumptions and the formula so the number "
-        "is defensible."
+    _section_header("💡", "Business insights", "#10b981")
+    _lead(
+        "A forecast only matters if it drives <strong>action</strong>. The reusable "
+        "<code>src.business</code> functions turn the selected forecast into a "
+        "driver-positioning plan and quantify the benefit - with assumptions and the "
+        "formula shown so the number is defensible."
     )
 
     _, index, results, is_real = get_model_results(scope)
@@ -569,18 +794,18 @@ def render_business_insights(scope: ScopeConfig) -> None:
     scored = [r for r in results if r.forecast is not None and r.metrics is not None]
     scored.sort(key=lambda r: r.metrics.mae)
     best = scored[0]
-    st.markdown(f"Deriving the recommendation from the **{best.model_name}** forecast.")
 
     recommendation = positioning_recommendation(best.forecast, scope)
-    st.subheader("Driver-positioning recommendation (Requirement 7.1)")
-    st.markdown(f"> {recommendation.action}")
+    st.markdown(f"#### 🧭 Driver-positioning recommendation (from the {best.model_name} forecast)")
+    st.info(recommendation.action)
 
     impact = quantify_impact(recommendation)
-    st.subheader("Quantified impact (Requirements 7.2, 7.3)")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Rider wait-minutes saved", f"{impact.rider_wait_minutes_saved:,.0f}")
-    col2.metric("Driver idle-minutes saved", f"{impact.driver_idle_minutes_saved:,.0f}")
-    col3.metric("Total minutes saved", f"{impact.total_minutes_saved:,.0f}")
+    st.markdown("#### 📉 Quantified impact")
+    _kpis([
+        ("Rider wait-minutes saved", f"{impact.rider_wait_minutes_saved:,.0f}", "#6366f1"),
+        ("Driver idle-minutes saved", f"{impact.driver_idle_minutes_saved:,.0f}", "#06b6d4"),
+        ("Total minutes saved", f"{impact.total_minutes_saved:,.0f}", "#22c55e"),
+    ])
     st.markdown(f"**In business terms:** {impact.narrative}")
 
     with st.expander("Assumptions & formula (so the number is reproducible)"):
@@ -592,7 +817,7 @@ def render_business_insights(scope: ScopeConfig) -> None:
 
 def render_india(scope: ScopeConfig) -> None:
     """Section 9: generalisation to India (Ola, Uber, Rapido)."""
-    st.header("Generalisation to India (Ola, Uber, Rapido)")
+    _section_header("🇮🇳", "Generalisation to India (Ola, Uber, Rapido)", "#f97316")
     # The narrative text is the single source of truth in src.business.
     st.markdown(india_generalization())
 
@@ -794,7 +1019,7 @@ def render_upload_analyze(scope: ScopeConfig) -> None:
     either displays a descriptive error naming the offending column (R9.5) or
     analyses the conforming data (R9.4).
     """
-    st.header("Upload & forecast your own data")
+    _section_header("📤", "Upload & forecast your own data", "#0ea5e9")
     st.markdown(
         """
 Bring your own demand data: this mode **validates it, charts it, fits a model live,
@@ -869,14 +1094,26 @@ def main() -> None:
     )
 
     scope = default_scope()
+    _inject_theme()
+
+    # Reflect whether the app is showing real prepared data or the illustrative fallback.
+    _, series_is_real = get_demand_series(scope)
+    badge = "Real NYC TLC data" if series_is_real else "Illustrative demo data"
 
     st.sidebar.title("🚕 Demand Forecasting")
-    st.sidebar.caption("A storytelling walkthrough of the project.")
+    st.sidebar.caption("A colourful storytelling walkthrough.")
     selection = st.sidebar.radio("Go to section", list(SECTIONS.keys()))
     st.sidebar.markdown("---")
     st.sidebar.caption(
-        f"Scope: {scope.time_grain} · {scope.geographic_grain} · "
+        f"Scope: {scope.time_grain} · {scope.geographic_grain}\n\n"
         f"{scope.window_start} → {scope.window_end}"
+    )
+
+    _hero(
+        "Ride-Hailing Demand Forecasting",
+        "Forecasting where and when demand will peak - on real NYC TLC data - so drivers "
+        "can be positioned ahead of need, cutting rider wait time and driver idle time.",
+        badge,
     )
 
     # Dispatch to the chosen section's render function.
