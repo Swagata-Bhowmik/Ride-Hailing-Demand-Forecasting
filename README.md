@@ -27,7 +27,7 @@ it four ways (below).
 | | Deliverable | What it is |
 |---|---|---|
 | 🌐 | **[Live interactive app](https://ride-hailing-demand-forecasting-swagata-bhowmik.streamlit.app/)** | A hosted Streamlit dashboard — click and explore, **no setup**. Includes an **upload-your-own-data → live forecast** mode. |
-| 📄 | **[`dashboard.html`](dashboard.html)** | A single, self-contained **offline report** — download and double-click; opens in any browser with no Python or internet. |
+| 📄 | **[Interactive report (HTML)](https://swagata-bhowmik.github.io/Ride-Hailing-Demand-Forecasting/)** | A self-contained visual report, hosted via GitHub Pages so it opens in any browser. Also downloadable as [`dashboard.html`](dashboard.html) to view completely offline (no Python, no internet). |
 | 📓 | **[`notebook/demand_forecasting.ipynb`](notebook/demand_forecasting.ipynb)** | The deep, guided **technical notebook** — every step explained and run, with real charts, tables and numbers saved inline. |
 | 📖 | **This README** | The whole story in one read — understand the project **without opening anything**. |
 
