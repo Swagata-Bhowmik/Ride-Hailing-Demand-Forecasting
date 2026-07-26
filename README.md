@@ -217,32 +217,22 @@ showing the assumptions and formula so the number is reproducible.
 
 ---
 
-## Deployment (Streamlit Community Cloud)
+## Deployment
 
-The dashboard is designed to be hosted for free at a public URL so anyone can open
-it **without any local setup** (Requirement 11).
+The dashboard is deployed on **Streamlit Community Cloud** and runs at a public URL
+with zero setup for the visitor:
 
-**The deploy is performed by you (the project owner) from your own Streamlit
-Community Cloud account.** Steps:
+> **🌐 https://ride-hailing-demand-forecasting-swagata-bhowmik.streamlit.app/**
 
-1. Push this repository to GitHub (public).
-2. Go to [share.streamlit.io](https://share.streamlit.io) and sign in with GitHub.
-3. Click **New app** → **Deploy a public app from GitHub**, and select this
-   repository and the `main` branch.
-4. Set **Main file path** to `dashboard/app.py`.
-5. (Optional) Under **Advanced settings**, set the **Python version** to 3.11.
-6. Click **Deploy**. Streamlit automatically installs from the root
-   **`requirements.txt`** — which is intentionally lightweight (pandas, pyarrow,
-   matplotlib, statsmodels, streamlit), so the free-tier build stays fast. The app
-   reads the committed prepared artifacts and fits only the fast Holt-Winters model
-   at runtime, so it never needs the heavy training packages in
-   `requirements-full.txt` (tensorflow, prophet, xgboost). Streamlit then serves the
-   app at a public `*.streamlit.app` URL.
-
-The committed `.streamlit/config.toml` supplies sensible server and theme settings
-(headless mode, a 50 MB upload cap for the *Upload & analyze* mode, and a
-taxi-yellow theme). Secrets are **not** stored there — they belong in
-`.streamlit/secrets.toml`, which is git-ignored.
+The deployment is deliberately lean. Streamlit serves `dashboard/app.py` and installs
+from the lightweight root `requirements.txt` (pandas, pyarrow, matplotlib, statsmodels,
+plotly, streamlit), so the free-tier build stays fast. The app reads the committed
+prepared artifacts (`dashboard/demand_series.csv`, `dashboard/model_results.json`) and
+fits only the fast Holt-Winters model at runtime — it never needs the heavy training
+packages (tensorflow, prophet, xgboost), which live in `requirements-full.txt` for
+local work. Server and theme settings ship in `.streamlit/config.toml` (headless mode,
+a 50 MB upload cap for the upload-and-forecast mode, taxi-yellow theme); secrets are
+kept out of the repository.
 
 > **🌐 Live dashboard:** https://ride-hailing-demand-forecasting-swagata-bhowmik.streamlit.app/
 
