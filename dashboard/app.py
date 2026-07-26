@@ -648,6 +648,143 @@ def _analyze_uploaded_series(series: pd.DataFrame, scope: ScopeConfig) -> None:
     except Exception as exc:  # noqa: BLE001 - charting is best-effort on user data
         st.warning(f"Could not chart the uploaded series: {exc}")
 
+    # Turn the uploaded data into a real forecast + recommendation.
+    _forecast_uploaded_series(series, scope)
+
+
+def _forecast_total_per_period(forecast, period_index) -> "np.ndarray":
+    """Reduce any Forecast shape to a total-per-period array aligned to ``period_index``."""
+    values = forecast.values
+    index = forecast.index
+    if isinstance(values, pd.DataFrame):
+        per = values.sum(axis=1)
+        per.index = pd.to_datetime(values.index)
+    elif isinstance(index, pd.MultiIndex) and PERIOD_COLUMN in (index.names or []):
+        periods = pd.to_datetime(index.get_level_values(PERIOD_COLUMN))
+        per = pd.DataFrame(
+            {"p": periods, "v": np.asarray(values, dtype=float).ravel()}
+        ).groupby("p")["v"].sum()
+    else:
+        arr = np.asarray(values, dtype=float).ravel()
+        per = pd.Series(arr, index=pd.to_datetime(list(index)) if index is not None else period_index[: len(arr)])
+    return per.reindex(period_index).fillna(0.0).to_numpy(dtype=float)
+
+
+def _forecast_uploaded_series(series: pd.DataFrame, scope: ScopeConfig) -> None:
+    """Fit a fast model on the uploaded series and show a real forecast + recommendation.
+
+    Uses Holt-Winters (statsmodels - already in the deploy requirements) fit per
+    region. When the series is long enough it reserves a holdout to score accuracy
+    honestly, then refits on the full series, forecasts forward, and turns that
+    forecast into a driver-positioning recommendation with quantified impact.
+    Best-effort: any failure shows a clear message instead of crashing the app.
+    """
+    from src.evaluation import build_model_results, comparison_table, split_holdout
+    from src.models.base import Forecast, TrainedModel
+    from src.models.holt_winters import HoltWinters
+
+    st.subheader("Forecast your data (Holt-Winters)")
+    st.markdown(
+        "We now **fit a model live on your upload** and forecast forward. Holt-Winters "
+        "(exponential smoothing) is used per region because it is fast and needs no heavy "
+        "dependencies. Your periods are treated at the project's daily grain."
+    )
+
+    work = series[[PERIOD_COLUMN, REGION_COLUMN, DEMAND_COLUMN]].copy()
+    work[PERIOD_COLUMN] = pd.to_datetime(work[PERIOD_COLUMN], errors="coerce")
+    work = work.dropna(subset=[PERIOD_COLUMN, REGION_COLUMN])
+    n_periods = work[PERIOD_COLUMN].nunique()
+    if n_periods < 4:
+        st.info(
+            f"Only {n_periods} distinct period(s) in your data — too few to forecast "
+            "meaningfully. Upload a longer series (ideally several weeks of daily data)."
+        )
+        return
+
+    # --- 1) Honest accuracy check on a held-out tail (only if long enough) ---
+    holdout_h = max(1, min(int(scope.holdout_periods), n_periods // 4))
+    if n_periods - holdout_h >= 2:
+        try:
+            train, holdout = split_holdout(work, holdout_h)
+            hidx = pd.DatetimeIndex(np.sort(holdout[PERIOD_COLUMN].unique()))
+            actual_total = (
+                holdout.groupby(PERIOD_COLUMN)[DEMAND_COLUMN].sum().reindex(hidx)
+            ).to_numpy(dtype=float)
+
+            model = HoltWinters()
+            model.fit(train, scope)
+            fc = model.predict(len(hidx))
+            fc_total = _forecast_total_per_period(fc, hidx)
+
+            tm = TrainedModel(
+                model_name="Holt-Winters",
+                forecaster=object(),
+                forecast=Forecast("Holt-Winters", fc_total, hidx),
+            )
+            results = build_model_results([tm], actual_total)
+            row = comparison_table(results).iloc[0]
+
+            st.markdown(
+                f"**Accuracy on the most recent {len(hidx)} periods** (reserved from "
+                "training, so this is honest out-of-sample error):"
+            )
+            c1, c2, c3 = st.columns(3)
+            c1.metric("MAE", f"{row['mae']:,.0f}")
+            c2.metric("RMSE", f"{row['rmse']:,.0f}")
+            c3.metric("MAPE", f"{row['mape']:.2f}%")
+
+            fig = plot_forecast_vs_actual(actual_total, results, index=hidx)
+            st.pyplot(fig)
+            st.caption(
+                "Bold line = your actual demand on the held-out tail; the other line is "
+                "the model's forecast. Closer is better."
+            )
+        except Exception as exc:  # noqa: BLE001 - never crash on user data
+            st.warning(f"Could not run the holdout accuracy check: {exc}")
+    else:
+        st.info("Series is short, so no holdout is reserved — showing a forward forecast only.")
+
+    # --- 2) Forward forecast on the FULL series + recommendation ---
+    try:
+        horizon = int(min(14, max(7, n_periods // 4)))
+        full_model = HoltWinters()
+        full_model.fit(work, scope)
+        future = full_model.predict(horizon)
+
+        st.markdown(f"**Forward forecast — the next {horizon} periods:**")
+        if isinstance(future.index, pd.MultiIndex):
+            fut = pd.DataFrame(
+                {
+                    PERIOD_COLUMN: pd.to_datetime(future.index.get_level_values(PERIOD_COLUMN)),
+                    REGION_COLUMN: future.index.get_level_values(REGION_COLUMN),
+                    DEMAND_COLUMN: np.asarray(future.values, dtype=float).ravel(),
+                }
+            )
+            wide = (
+                fut.pivot_table(index=PERIOD_COLUMN, columns=REGION_COLUMN, values=DEMAND_COLUMN)
+                .round(0)
+                .astype(int)
+            )
+            wide.insert(0, "TOTAL", wide.sum(axis=1))
+            st.dataframe(wide, use_container_width=True)
+            st.caption("Predicted trip count per region (and total) for each upcoming period.")
+
+        rec = positioning_recommendation(future, scope)
+        st.markdown("**Driver-positioning recommendation from your forecast:**")
+        st.markdown(f"> {rec.action}")
+
+        impact = quantify_impact(rec)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Rider wait-minutes saved", f"{impact.rider_wait_minutes_saved:,.0f}")
+        c2.metric("Driver idle-minutes saved", f"{impact.driver_idle_minutes_saved:,.0f}")
+        c3.metric("Total minutes saved", f"{impact.total_minutes_saved:,.0f}")
+        st.caption(
+            "Impact is an estimate from documented assumptions (see the Business insights "
+            "section); it scales with your predicted demand."
+        )
+    except Exception as exc:  # noqa: BLE001 - never crash on user data
+        st.warning(f"Could not produce a forward forecast: {exc}")
+
 
 def render_upload_analyze(scope: ScopeConfig) -> None:
     """Upload-and-analyze mode with input-format validation (Requirements 9.4, 9.5).
@@ -657,11 +794,13 @@ def render_upload_analyze(scope: ScopeConfig) -> None:
     either displays a descriptive error naming the offending column (R9.5) or
     analyses the conforming data (R9.4).
     """
-    st.header("Upload & analyze your own data")
+    st.header("Upload & forecast your own data")
     st.markdown(
         """
-Bring your own demand data and analyse it with the same pipeline. The file must be
-a **long-format demand series** (CSV or Parquet) with exactly these columns:
+Bring your own demand data: this mode **validates it, charts it, fits a model live,
+forecasts it forward, and turns the forecast into a positioning recommendation**.
+The file must be a **long-format demand series** (CSV or Parquet) with exactly these
+columns:
 
 | column | type | meaning |
 |---|---|---|
