@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -150,6 +151,52 @@ def build_demo_model_results(scope: ScopeConfig):
 
     results = build_model_results(train_results, actual)
     return actual, index, results
+
+
+#: The real model-results artifact written by ``scripts/train_models.py``.
+_MODEL_RESULTS_PATH = _PROJECT_ROOT / "dashboard" / "model_results.json"
+
+
+def load_real_model_results(scope: ScopeConfig):
+    """Return ``(actual, index, results, artifact)`` from the real artifact, or ``None``.
+
+    Mirrors ``dashboard.app.load_real_model_results``: reconstructs a
+    :class:`~src.models.base.TrainedModel` per scored model and an
+    :class:`~src.models.base.ExclusionRecord` per excluded one from the JSON, then
+    routes them through the *real* :func:`~src.evaluation.build_model_results` so
+    the metrics are recomputed from the real forecast arrays. Returns ``None`` when
+    the artifact is absent/unreadable so the caller falls back to the demo.
+    """
+    if not _MODEL_RESULTS_PATH.exists():
+        return None
+    try:
+        artifact = json.loads(_MODEL_RESULTS_PATH.read_text(encoding="utf-8"))
+        index = pd.DatetimeIndex(pd.to_datetime(artifact["index"]))
+        actual = np.asarray(artifact["actual"], dtype=float)
+        train_results = []
+        for model in artifact["models"]:
+            if model.get("values") is None:
+                train_results.append(
+                    ExclusionRecord(
+                        model_name=model["name"],
+                        reason=model.get("excluded_reason", "excluded"),
+                    )
+                )
+            else:
+                forecast = Forecast(
+                    model_name=model["name"],
+                    values=np.asarray(model["values"], dtype=float),
+                    index=index,
+                )
+                train_results.append(
+                    TrainedModel(
+                        model_name=model["name"], forecaster=object(), forecast=forecast
+                    )
+                )
+        results = build_model_results(train_results, actual)
+        return actual, index, results, artifact
+    except Exception:  # pragma: no cover - any read/parse error falls back to demo
+        return None
 
 
 def get_demand_series(scope: ScopeConfig) -> "tuple[pd.DataFrame, bool]":
@@ -667,14 +714,28 @@ def _metric_cards() -> str:
 
 
 def _section_results(table: pd.DataFrame, comparison_fig_div: str,
-                     forecast_fig_div: str) -> str:
+                     forecast_fig_div: str, models_is_real: bool = False) -> str:
     table_html = _df_to_html_table(
         table.sort_values("mae", na_position="last").reset_index(drop=True)
     )
     names, justification = select_carry_forward(table, return_justification=True)
+    if models_is_real:
+        source_note = (
+            '<p class="muted">✅ <strong>Real results.</strong> These metrics come from the '
+            "candidate models fit on the real NYC TLC demand series "
+            "(<code>python scripts/train_models.py</code>), scored on the reserved holdout at "
+            "the system-wide total-daily-demand level.</p>"
+        )
+    else:
+        source_note = (
+            '<p class="muted">⚠ <strong>Illustrative scoreboard.</strong> These forecasts are '
+            "synthetic placeholders until <code>python scripts/train_models.py</code> is run "
+            "over the prepared series.</p>"
+        )
     return f"""
 <div class="lead">The honest scoreboard: every model (including underperformers and excluded
 ones), scored by the reusable <code>src.evaluation</code> functions.</div>
+{source_note}
 <h3>🔎 How to read the error metrics</h3>
 {_metric_cards()}
 <h3>📊 Model comparison chart</h3>
@@ -870,7 +931,13 @@ code{background:#eef2ff;color:#4338ca;padding:1px 6px;border-radius:5px;font-siz
 
 def _build_html(scope: ScopeConfig, series: pd.DataFrame, is_real: bool) -> str:
     """Assemble the full self-contained HTML document string."""
-    actual, index, results = build_demo_model_results(scope)
+    real_model_results = load_real_model_results(scope)
+    if real_model_results is not None:
+        actual, index, results, _artifact = real_model_results
+        models_is_real = True
+    else:
+        actual, index, results = build_demo_model_results(scope)
+        models_is_real = False
     table = comparison_table(results)
 
     # The FIRST figure embeds Plotly's JS inline; the rest reuse it.
@@ -888,7 +955,7 @@ def _build_html(scope: ScopeConfig, series: pd.DataFrame, is_real: bool) -> str:
         "data-preparation": _section_data_preparation(series),
         "tools": _section_tools(scope),
         "models": _section_models(scope),
-        "results": _section_results(table, comparison_div, forecast_div),
+        "results": _section_results(table, comparison_div, forecast_div, models_is_real),
         "insights": _section_insights(scope, results),
         "india": _section_india(),
     }

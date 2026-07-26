@@ -38,6 +38,7 @@ Design references:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -176,6 +177,65 @@ def build_demo_model_results(scope: ScopeConfig):
     return actual, index, results
 
 
+#: The real model-results artifact written by ``scripts/train_models.py`` (real
+#: NYC TLC fits, evaluated at the system-wide total-daily-demand level). Small and
+#: committed so the deployed dashboard shows real numbers.
+_MODEL_RESULTS_PATH = _PROJECT_ROOT / "dashboard" / "model_results.json"
+
+
+def load_real_model_results(scope: ScopeConfig):
+    """Return ``(actual, index, results, artifact)`` from the real artifact, or ``None``.
+
+    Reads the JSON written by ``scripts/train_models.py`` and reconstructs the same
+    ``(actual, index, results)`` bundle :func:`build_demo_model_results` returns -
+    a :class:`~src.models.base.TrainedModel` for every scored model and an
+    :class:`~src.models.base.ExclusionRecord` for every excluded one - then routes
+    them through the *real* :func:`~src.evaluation.build_model_results`, so the
+    metrics are recomputed from the real forecast arrays rather than stored. Returns
+    ``None`` when the artifact is absent or unreadable so callers fall back to the
+    illustrative demo.
+    """
+    if not _MODEL_RESULTS_PATH.exists():
+        return None
+    try:
+        with open(_MODEL_RESULTS_PATH, "r", encoding="utf-8") as fh:
+            artifact = json.load(fh)
+        index = pd.DatetimeIndex(pd.to_datetime(artifact["index"]))
+        actual = np.asarray(artifact["actual"], dtype=float)
+
+        train_results = []
+        for model in artifact["models"]:
+            if model.get("values") is None:
+                train_results.append(
+                    ExclusionRecord(
+                        model_name=model["name"],
+                        reason=model.get("excluded_reason", "excluded"),
+                    )
+                )
+            else:
+                values = np.asarray(model["values"], dtype=float)
+                forecast = Forecast(model_name=model["name"], values=values, index=index)
+                train_results.append(
+                    TrainedModel(
+                        model_name=model["name"], forecaster=object(), forecast=forecast
+                    )
+                )
+        results = build_model_results(train_results, actual)
+        return actual, index, results, artifact
+    except Exception:  # pragma: no cover - any read/parse error falls back to demo
+        return None
+
+
+def get_model_results(scope: ScopeConfig):
+    """Return ``(actual, index, results, is_real)`` - real artifact if present, else demo."""
+    real = load_real_model_results(scope)
+    if real is not None:
+        actual, index, results, _ = real
+        return actual, index, results, True
+    actual, index, results = build_demo_model_results(scope)
+    return actual, index, results, False
+
+
 def get_demand_series(scope: ScopeConfig) -> "tuple[pd.DataFrame, bool]":
     """Return ``(series, is_real)`` - the prepared series if on disk, else the demo.
 
@@ -208,6 +268,23 @@ def _demo_notice(is_real: bool) -> None:
             "clearly-labelled series so the reusable analysis functions render. "
             "Run the pipeline over the validated NYC TLC data to populate the real "
             "numbers (save the prepared series to `data/demand_series.parquet`)."
+        )
+
+
+def _model_results_notice(is_real: bool) -> None:
+    """Flag whether the model scoreboard comes from real fits or the illustrative demo."""
+    if is_real:
+        st.success(
+            "Real results. These metrics come from the candidate models fit on the "
+            "real NYC TLC demand series (via `scripts/train_models.py`), scored on "
+            "the reserved holdout at the system-wide total-daily-demand level."
+        )
+    else:
+        st.info(
+            "Illustrative demonstration scoreboard. These forecasts are synthetic, "
+            "clearly-labelled placeholders so the reusable evaluation functions "
+            "render. Run `python scripts/train_models.py` over the prepared series "
+            "to populate the real model results."
         )
 
 
@@ -435,8 +512,8 @@ def render_results(scope: ScopeConfig) -> None:
         "functions."
     )
 
-    actual, index, results = build_demo_model_results(scope)
-    _demo_notice(False)
+    actual, index, results, is_real = get_model_results(scope)
+    _model_results_notice(is_real)
 
     st.subheader("Model comparison table (Requirements 6.3, 9.3)")
     table = comparison_table(results)
@@ -475,8 +552,8 @@ def render_business_insights(scope: ScopeConfig) -> None:
         "is defensible."
     )
 
-    _, index, results = build_demo_model_results(scope)
-    _demo_notice(False)
+    _, index, results, is_real = get_model_results(scope)
+    _model_results_notice(is_real)
 
     # Use the best-scored model's forecast to derive a recommendation.
     scored = [r for r in results if r.forecast is not None and r.metrics is not None]
