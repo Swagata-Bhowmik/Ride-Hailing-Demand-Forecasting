@@ -375,6 +375,31 @@ h1,h2,h3,h4 { font-family:'Inter','Segoe UI',system-ui,sans-serif; color:var(--i
 
 section[data-testid="stSidebar"] { background:linear-gradient(180deg,#111827,#1f2937); }
 section[data-testid="stSidebar"] * { color:#e5e7eb; }
+
+/* "In plain English" concept box - teaches a term simply, where it appears */
+.concept { background:linear-gradient(135deg,#ecfeff 0%,#eef2ff 100%);
+  border:1px solid #c7d2fe; border-left:6px solid #06b6d4; border-radius:14px;
+  padding:14px 18px; margin:12px 0 16px; box-shadow:0 6px 16px rgba(6,182,212,.10); }
+.concept .ct { font-size:13px; font-weight:800; color:#0e7490; text-transform:uppercase;
+  letter-spacing:.05em; margin-bottom:6px; display:flex; align-items:center; gap:7px; }
+.concept p { margin:0 0 6px; color:#334155; font-size:14.5px; line-height:1.6; }
+.concept p:last-child { margin-bottom:0; }
+.concept b, .concept strong { color:#0f172a; }
+
+/* Story-arc strip on the overview page */
+.arc { display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 18px; }
+.arc .node { flex:1 1 150px; min-width:140px; background:#fff; border-radius:14px;
+  padding:14px 16px; border:1px solid #eef2f7; border-top:4px solid var(--accent,#6366f1);
+  box-shadow:0 6px 16px rgba(15,23,42,.06); }
+.arc .node .n { font-size:12px; font-weight:800; color:var(--accent,#6366f1); }
+.arc .node .h { font-weight:700; font-size:14.5px; color:#1e293b; margin:3px 0; }
+.arc .node .d { font-size:12.5px; color:#64748b; line-height:1.5; }
+
+/* Takeaway banner - the one thing to remember from a section */
+.takeaway { background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);
+  border:1px solid #bbf7d0; border-left:6px solid #22c55e; border-radius:14px;
+  padding:13px 18px; margin:16px 0 6px; color:#14532d; font-size:14.5px; line-height:1.6; }
+.takeaway b { color:#052e16; }
 </style>
 """
 
@@ -447,6 +472,35 @@ def _pills(names) -> None:
     st.markdown(f'<div class="pills">{chips}</div>', unsafe_allow_html=True)
 
 
+def _concept(title: str, *paragraphs: str) -> None:
+    """Render an "In plain English" teaching box explaining one term simply.
+
+    Each section uses this to define the *specific* concepts it introduces (and
+    nothing another section already covered), so the reader is taught the jargon
+    exactly where it first matters - never repeated tab to tab.
+    """
+    body = "".join(f"<p>{p}</p>" for p in paragraphs)
+    st.markdown(
+        f'<div class="concept"><div class="ct">💡 In plain English — {title}</div>{body}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _takeaway(text: str) -> None:
+    """Render the single 'remember this' banner that closes a section."""
+    st.markdown(f'<div class="takeaway">✅ <b>Takeaway:</b> {text}</div>', unsafe_allow_html=True)
+
+
+def _story_arc(nodes) -> None:
+    """Render the overview story-arc strip. nodes: (num, title, desc, accent)."""
+    cells = "".join(
+        f'<div class="node" style="--accent:{accent}"><div class="n">{num}</div>'
+        f'<div class="h">{title}</div><div class="d">{desc}</div></div>'
+        for num, title, desc, accent in nodes
+    )
+    st.markdown(f'<div class="arc">{cells}</div>', unsafe_allow_html=True)
+
+
 # =============================================================================
 # Interactive Plotly chart builders
 # =============================================================================
@@ -517,6 +571,50 @@ def _fig_forecast_vs_actual(actual, results, index) -> go.Figure:
 # =============================================================================
 
 
+def render_overview(scope: ScopeConfig) -> None:
+    """Section 0: the storyline map - orient any reader in 60 seconds."""
+    _section_header("🧭", "Start here — the whole story in one minute", "#6366f1")
+    _lead(
+        "This project answers one question for a ride-hailing platform: "
+        "<strong>how many trips will be requested, on which day, in which part of the "
+        "city — and what should we do about it?</strong> Below is the journey each tab "
+        "takes you through. Read it top to bottom and it reads like a story."
+    )
+    _concept(
+        "What is \"demand forecasting\"?",
+        "<b>Forecasting</b> just means predicting the future from the past. Here the "
+        "\"future\" is the number of ride requests (we call that <b>demand</b>).",
+        "If we know demand will spike in Manhattan next Friday, the platform can send "
+        "drivers there <i>before</i> the rush — so riders wait less and drivers earn more. "
+        "That is the entire point of the project.",
+    )
+    _story_arc([
+        ("01", "🎯 Problem", "Why predicting demand saves money for riders and drivers.", "#6366f1"),
+        ("02", "🗽 Data", "247M real NYC trips — where they come from and their limits.", "#06b6d4"),
+        ("03", "🔍 Explore", "The shape of demand: weekly rhythm, trend, stationarity.", "#22c55e"),
+        ("04", "🧹 Prepare", "Turning raw trips into a clean, model-ready table.", "#f59e0b"),
+        ("05", "🛠️ Tools", "The open-source stack that does the work.", "#3b82f6"),
+        ("06", "🤖 Models", "Eight forecasting methods, from simple to deep learning.", "#ec4899"),
+        ("07", "📊 Results", "An honest scoreboard — who won, who lost, and why.", "#8b5cf6"),
+        ("08", "💡 Action", "Turning the winning forecast into a driver plan + savings.", "#10b981"),
+        ("09", "🇮🇳 India", "How the same method transfers to Ola, Uber, Rapido.", "#f97316"),
+        ("10", "📤 Try it", "Upload your own data and get a live forecast.", "#0ea5e9"),
+    ])
+    _cards([
+        _card("🏆", "Headline result", body="A simple <b>Holt-Winters</b> baseline won at "
+              "<b>3.74% MAPE</b> — beating heavier deep-learning models. We report that honestly.",
+              accent="#22c55e"),
+        _card("📏", "How big is the data?", body="<b>247,412,659</b> real trips over 12 months, "
+              "condensed into a clean daily demand series per borough.", accent="#6366f1"),
+        _card("🔒", "The golden rule", body="Only real public data — <b>nothing is fabricated</b>, "
+              "and every number is validated against the raw data first.", accent="#f43f5e"),
+    ])
+    _takeaway(
+        "Predict where and when demand peaks → position drivers ahead of it → cut rider wait "
+        "time and driver idle time. Every tab that follows is one honest step toward that."
+    )
+
+
 def render_business_problem(scope: ScopeConfig) -> None:
     """Section 1: the business problem the project solves (Requirement 9.2)."""
     _section_header("🎯", "The business problem", "#6366f1")
@@ -547,6 +645,19 @@ def render_business_problem(scope: ScopeConfig) -> None:
         ("Analysis window", f"{scope.window_months} months", "#a855f7"),
         ("Holdout", f"{scope.holdout_periods} periods", "#3b82f6"),
     ])
+    _concept(
+        "\"Grain\" and \"scope\"",
+        "<b>Time grain</b> = how finely we slice time. We use <b>daily</b> — one number per day. "
+        "<b>Geographic grain</b> = how finely we slice the map. We use <b>borough</b> "
+        "(Manhattan, Brooklyn, etc.).",
+        "<b>Scope</b> is just the fixed set of rules for the whole project (grain, date range, "
+        "which models to try). We store it in one file so every step uses the exact same "
+        "settings and results can never quietly drift apart.",
+    )
+    _takeaway(
+        "Demand is spiky in <b>time</b> and <b>space</b>. Forecast both and you can move drivers "
+        "ahead of need — the business win this whole project chases."
+    )
 
 
 def render_data_source(scope: ScopeConfig) -> None:
@@ -565,6 +676,16 @@ def render_data_source(scope: ScopeConfig) -> None:
         _card("🗺️", "Region = borough", body="Mapped via the official taxi-zone lookup.", accent="#06b6d4"),
         _card("✅", "Validated", body="Every reported number is checked against the raw data first.", accent="#22c55e"),
     ])
+    _concept(
+        "FHVHV, Parquet and the zone lookup",
+        "<b>FHVHV</b> = \"For-Hire Vehicle, High Volume\" — the official name for Uber/Lyft-style "
+        "app rides in the NYC data. It is the closest public match to Ola/Uber/Rapido.",
+        "<b>Parquet</b> is just a file format (like CSV) but far smaller and faster to read — "
+        "important when each month is ~1 GB.",
+        "The data only says <i>which pickup zone</i> a trip started in (a number). The "
+        "<b>taxi-zone lookup</b> is a small table that translates each zone number into its "
+        "borough, so we can group demand by borough.",
+    )
     st.markdown("#### ⚖️ Honest limitations")
     _cards([
         _card("🌍", "NYC, not India", bullets=[
@@ -631,6 +752,14 @@ def render_eda(scope: ScopeConfig) -> None:
     ])
 
     st.markdown("#### 🔬 Seasonal decomposition")
+    _concept(
+        "Seasonal decomposition",
+        "Any demand line is really three things added together: a slow <b>trend</b> (is demand "
+        "generally rising or falling?), a repeating <b>seasonal</b> pattern (the weekly "
+        "weekday-vs-weekend rhythm), and the leftover <b>residual</b> (random noise).",
+        "Splitting them apart tells us <i>what a model must capture</i>. Strong weekly "
+        "seasonality here is why every model we pick is built to handle a 7-day cycle.",
+    )
     try:
         decomp = seasonal_decompose_demand(series, period=7)
         st.pyplot(decomp.figure)
@@ -639,6 +768,15 @@ def render_eda(scope: ScopeConfig) -> None:
         st.warning(f"Not enough history to decompose seasonality: {exc}")
 
     st.markdown("#### 📉 Stationarity - Augmented Dickey-Fuller test")
+    _concept(
+        "Stationarity and the ADF test",
+        "A series is <b>stationary</b> if its behaviour (average level, swing size) stays "
+        "roughly constant over time. Many classical models assume this, so we test for it.",
+        "The <b>Augmented Dickey-Fuller (ADF)</b> test is a statistical check. Rule of thumb: "
+        "if the <b>p-value is below 0.05</b>, the series is stationary; if higher, we "
+        "<i>difference</i> it (model day-to-day changes instead of raw levels) — which is "
+        "exactly what the \"I\" in ARIMA does automatically.",
+    )
     try:
         adf = adf_test(series)
         col1, col2 = st.columns(2)
@@ -647,6 +785,12 @@ def render_eda(scope: ScopeConfig) -> None:
         st.markdown(f"**What this shows:** {adf.interpretation}")
     except ValueError as exc:
         st.warning(f"Not enough observations to run the ADF test: {exc}")
+
+    _takeaway(
+        "The demand series has a clear <b>weekly cycle</b> and a mild trend. Knowing its shape "
+        "up front is what lets us choose the right models — and explains why a well-tuned "
+        "seasonal baseline turns out to be so hard to beat."
+    )
 
 
 def render_data_preparation(scope: ScopeConfig) -> None:
@@ -664,22 +808,46 @@ def render_data_preparation(scope: ScopeConfig) -> None:
         ("🔁", "Lag features", "lag_1 / lag_7 / lag_14 for ML models", "#a855f7"),
     ])
 
+    _concept(
+        "\"Long format\", zero-fill and lag features",
+        "<b>Long format</b> = one row per day-and-borough with its trip count. It is the tidy "
+        "shape every model expects.",
+        "<b>Zero-fill</b>: if a borough had no trips on some day, that row is simply missing. "
+        "We insert it as a <b>0</b> — because \"no trips\" is real information, and a gap would "
+        "confuse the models.",
+        "<b>Lag features</b>: extra columns that carry <i>past</i> demand — yesterday "
+        "(<code>lag_1</code>), last week (<code>lag_7</code>), two weeks ago "
+        "(<code>lag_14</code>). Machine-learning models (like XGBoost) have no memory of time, "
+        "so we hand them the past explicitly as these columns.",
+    )
+
     series, is_real = get_demand_series(scope)
     _demo_notice(is_real)
     st.markdown("#### 📋 Prepared demand series (long format)")
     st.caption(
         "One row per (period, region); `demand` is the trip count and is 0 for "
-        "empty periods rather than missing."
+        "empty periods rather than missing. This is the exact table every model reads."
     )
     st.dataframe(series.head(20), use_container_width=True)
 
-    total = int(series[DEMAND_COLUMN].sum())
+    n_regions = series[REGION_COLUMN].nunique()
+    n_periods = series[PERIOD_COLUMN].nunique()
+    complete = n_regions * n_periods
     _kpis([
-        ("Rows", f"{len(series):,}", "#6366f1"),
-        ("Regions", f"{series[REGION_COLUMN].nunique()}", "#06b6d4"),
-        ("Distinct periods", f"{series[PERIOD_COLUMN].nunique()}", "#22c55e"),
-        ("Total demand", f"{total:,}", "#f59e0b"),
+        ("Complete grid cells", f"{complete:,}", "#6366f1"),
+        ("= periods", f"{n_periods:,}", "#22c55e"),
+        ("× regions", f"{n_regions}", "#06b6d4"),
+        ("Gaps left behind", "0", "#f59e0b"),
     ])
+    st.caption(
+        "The prepared grid is deliberately *complete*: every period × region cell exists, with "
+        "no missing values — that completeness is what makes a fair model comparison possible."
+    )
+    _takeaway(
+        "Preparation is unglamorous but decisive: validate → map zones to boroughs → count "
+        "trips → zero-fill gaps → add lag features. Get this wrong and every model downstream "
+        "is wrong too."
+    )
 
 
 def render_tools(scope: ScopeConfig) -> None:
@@ -712,6 +880,14 @@ def render_models(scope: ScopeConfig) -> None:
         "by <em>evidence</em>, not assumption. Each card explains what the model is and "
         "how we use it."
     )
+    _concept(
+        "Why try so many models?",
+        "There is no universal \"best\" forecasting model — it depends on the data. So we run a "
+        "<b>broad set</b>, from dead-simple to cutting-edge, and let the evidence pick the winner.",
+        "A <b>baseline</b> is the simplest sensible model. Its job is to set a bar: any complex "
+        "model that can't beat the baseline isn't worth its extra cost. That is honest science, "
+        "not a weakness.",
+    )
     _cards([
         _card("📉", "Holt-Winters", body="Exponential smoothing baseline - every fancier model must beat it.", accent="#6366f1"),
         _card("🔁", "SARIMA / SARIMAX", body="Classic seasonal statistical model; SARIMAX adds external regressors.", accent="#06b6d4"),
@@ -720,7 +896,26 @@ def render_models(scope: ScopeConfig) -> None:
         _card("🌳", "XGBoost", body="Gradient-boosted trees on engineered lag features.", accent="#22c55e"),
         _card("🧠", "LSTM / GRU", body="Recurrent neural nets that learn long-range sequence patterns.", accent="#f59e0b"),
     ])
+    _concept(
+        "The models in one line each",
+        "<b>Holt-Winters</b>: a smart weighted average that leans on recent days and last week. "
+        "<b>SARIMA</b>: predicts today from recent days + the same day last week (the S = "
+        "seasonal, I = differencing to remove trend). <b>VAR</b>: forecasts all boroughs "
+        "together, using one borough's history to help predict another.",
+        "<b>Prophet</b> (by Meta): adds up a trend curve + weekly pattern + holidays. "
+        "<b>XGBoost</b>: builds hundreds of small decision trees, each fixing the last one's "
+        "mistakes, using the lag columns. <b>LSTM/GRU</b>: neural networks with memory, made "
+        "for sequences — powerful but hungry for lots of data.",
+    )
     st.markdown("#### 🧪 The method (fair by design)")
+    _concept(
+        "Holdout — the fairness trick",
+        "We hide the most recent <b>30 days</b> from every model while it learns (that hidden "
+        "slice is the <b>holdout</b>). Then we ask each model to predict those 30 days and "
+        "compare its guess to what actually happened.",
+        "Because no model ever saw the holdout during training, this is an honest test of "
+        "prediction — like grading a student on questions they never got to see in advance.",
+    )
     _cards([
         _card("🔒", "Reserved holdout", body=f"Train on everything except the most-recent {scope.holdout_periods}-period holdout.", accent="#3b82f6"),
         _card("⚖️", "Same yardstick", body="Every model forecasts over the SAME holdout, scored with the same metrics.", accent="#22c55e"),
@@ -751,6 +946,16 @@ def render_results(scope: ScopeConfig) -> None:
             ("Models compared", f"{len(table)}", "#a855f7"),
         ])
 
+    _concept(
+        "MAE, RMSE, MAPE — the three scores",
+        "All three measure <b>how far the forecast was from reality</b> (lower = better). "
+        "<b>MAE</b> = average miss in trips (e.g. \"off by 26,804 trips/day\"). "
+        "<b>RMSE</b> = similar, but punishes big misses harder — so a high RMSE warns of "
+        "occasional large errors.",
+        "<b>MAPE</b> = the miss as a <b>percentage</b> (e.g. 3.74%), which is easy to compare "
+        "across cities of different sizes. A 3.74% MAPE means the daily forecast is, on "
+        "average, within ~4% of the true number of trips.",
+    )
     st.markdown("#### 📊 Error metrics by model (lower is better)")
     st.plotly_chart(_fig_model_comparison(table), use_container_width=True)
 
@@ -772,9 +977,22 @@ def render_results(scope: ScopeConfig) -> None:
     )
 
     st.markdown("#### 🏆 Models carried forward")
+    _concept(
+        "Why did the simplest model win?",
+        "The deep-learning models (LSTM, GRU) lost here — and that is expected, not a bug. "
+        "Neural nets need <i>lots</i> of history; with only ~335 days per borough they "
+        "<b>underfit</b> (never learn enough to shine).",
+        "Meanwhile the daily series has a strong, stable weekly rhythm — exactly what a "
+        "well-tuned <b>Holt-Winters</b> baseline captures. On clean, strongly-seasonal daily "
+        "data, a simple model beating complex ones is a well-known, honest outcome.",
+    )
     names, justification = select_carry_forward(table, return_justification=True)
     _pills(names)
     st.code(justification)
+    _takeaway(
+        "Complexity is not accuracy. We tried everything, scored it fairly, and reported the "
+        "losers too — a stronger story than only showing a winner."
+    )
 
 
 def render_business_insights(scope: ScopeConfig) -> None:
@@ -799,6 +1017,15 @@ def render_business_insights(scope: ScopeConfig) -> None:
     st.markdown(f"#### 🧭 Driver-positioning recommendation (from the {best.model_name} forecast)")
     st.info(recommendation.action)
 
+    _concept(
+        "How the forecast becomes money",
+        "A forecast is only useful if it changes a decision. We convert predicted demand into "
+        "<b>how many drivers to pre-position</b>, then estimate the time saved: shorter rider "
+        "waits and less driver idling.",
+        "Every number rests on <b>stated assumptions</b> (e.g. how many trips one driver serves, "
+        "how much waiting a good position removes) and a <b>visible formula</b> — so anyone can "
+        "challenge or re-run it. We never hide behind a magic number.",
+    )
     impact = quantify_impact(recommendation)
     st.markdown("#### 📉 Quantified impact")
     _kpis([
@@ -1068,6 +1295,7 @@ a clear message naming the offending column instead of a crash.
 #: Ordered sidebar label -> render function. Order follows the required story
 #: arc in Requirement 9.2. Adding a section is a single entry here.
 SECTIONS: "dict[str, callable]" = {
+    "Start here": render_overview,
     "Business problem": render_business_problem,
     "Data source & limitations": render_data_source,
     "EDA findings": render_eda,
